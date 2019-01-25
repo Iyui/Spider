@@ -1,20 +1,21 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
-using static System.Console;
 using System.Text;
 using System.Net;
 using System.Text.RegularExpressions;
+using static Spider.Config;
 
 namespace Spider
 {
     public class ImageSpider
     {
+   
 
         public ImageSpider()
         {
-            urlOver += new UrlOverEventHandler(Config.ShowMessage);
-            urlError += new UrlErrorEventHandler(Config.ShowMessage);
+            urlOver += new UrlOverEventHandler(ShowMessage);
+            urlError += new UrlErrorEventHandler(ShowMessage);
         }
         public struct ImageInfo
         {
@@ -22,36 +23,35 @@ namespace Spider
             public string Url { get; set; }
         }
         public string path { get; set; } = "Images";//图片目录
-        List<ImageInfo> urls = new List<ImageInfo>();//存储定义的Url列表
 
-        public delegate void UrlOverEventHandler(string msg);//处理完成
+        //public delegate void UrlOverEventHandler(string msg);//处理完成
         public event UrlOverEventHandler urlOver = null;
 
-        public delegate void UrlErrorEventHandler(string errmsg);//发送错误
+        //public delegate void UrlErrorEventHandler(string errmsg);//发送错误
         public event UrlErrorEventHandler urlError = null;
 
-        public List<ImageInfo> Urls { get { return urls; } }
+        public List<ImageInfo> Urls { get; } = new List<ImageInfo>();
 
         public void AddUrl(string url, string path)
         {
-            urls.Add(new ImageInfo() { Url = url, Path = path });
+            Urls.Add(new ImageInfo() { Url = url, Path = path });
         }
 
         public void AddUrl(string url)
         {
-            urls.Add(new ImageInfo() { Url = url });
+            Urls.Add(new ImageInfo() { Url = url });
         }
 
         public void StartGetImage()//调用此方法开始抓取图片
         {
-            if (urls?.Count <= 0)
+            if (Urls?.Count <= 0)
             {
                 urlError?.Invoke("Url集合为空");
             }
             else
             {
                 urlOver?.Invoke("开始抓取图片...");
-                foreach (ImageInfo url in urls)
+                foreach (ImageInfo url in Urls)
                 {
                     string html = GetHtml(url.Url);
                     List<string> list = GetImgUrlList(html);
@@ -59,7 +59,6 @@ namespace Spider
                     urlOver?.Invoke("全部操作完成！");
                 }
             }
-
         }
 
         string GetHtml(string uri)//请求指定url取得返回的html数据
@@ -115,19 +114,24 @@ namespace Spider
             int s = 0, f = 0;
             foreach (string url in list)
             {
-
+                string name = "图片名获取失败";
                 //取文件名
-                string name = url.Substring(url.LastIndexOf('/') + 1, url.Length - url.LastIndexOf('/') - 5);
+                try
+                {
+                    name = url.Substring(url.LastIndexOf('/') + 1, url.Length - url.LastIndexOf('/') - 5);
+                }
+                catch
+                { continue; }
                 WebClient wc = new WebClient();
                 try
                 {
-                    wc.DownloadFile("http:" + url, dic + "\\" + name + ".jpg");
+                    wc.DownloadFile(url, dic + "\\" + name + ".jpg");
                     s++;
                     urlOver?.Invoke($"从{url}抓取图片{ name + ".jpg"}成功！");
                 }
                 catch (Exception ex)
                 {
-                    f++; urlOver?.Invoke($"从{url}抓取图片{name + ".jpg"}失败！");
+                    f++; urlOver?.Invoke($"从{url}抓取图片{name + ".jpg"}失败！" /*+ ex.ToString()*/);
                 }
                 finally { wc.Dispose(); }
             }
