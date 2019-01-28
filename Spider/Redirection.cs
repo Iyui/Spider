@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using static Spider.Config;
 using System.Net;
-
+using System.Threading.Tasks;
 namespace Spider
 {
     /// <summary>
@@ -26,17 +26,23 @@ namespace Spider
             /// </summary>
             public static string GetPageHtml(string url)
             {
-                // 设置参数
-                HttpWebRequest request = WebRequest.Create(url) as HttpWebRequest;
-                request.UserAgent = "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0; Trident/4.0)";
-                //发送请求并获取相应回应数据
-                HttpWebResponse response = request.GetResponse() as HttpWebResponse;
-                //直到request.GetResponse()程序才开始向目标网页发送Post请求
-                Stream responseStream = response.GetResponseStream();
-                StreamReader sr = new StreamReader(responseStream, Encoding.UTF8);
-                //返回结果网页（html）代码
-                string content = sr.ReadToEnd();
-                return content;
+                try
+                {
+                    // 设置参数
+                    HttpWebRequest request = WebRequest.Create(url) as HttpWebRequest;
+                    request.UserAgent = "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0; Trident/4.0)";
+                    //发送请求并获取相应回应数据
+                    HttpWebResponse response = request.GetResponse() as HttpWebResponse;
+                    //直到request.GetResponse()程序才开始向目标网页发送Post请求
+                    Stream responseStream = response.GetResponseStream();
+                    StreamReader sr = new StreamReader(responseStream, Encoding.UTF8);
+                    //返回结果网页（html）代码
+                    string content = sr.ReadToEnd();
+                    return content;
+                }
+                catch
+                { return ""; }
+
             }
 
         }
@@ -131,16 +137,13 @@ namespace Spider
                         else
                         {
                             if (GetHost(url) == host)
-                            {
-                                //ThreadPool.QueueUserWorkItem(new WaitCallback(delegate (object obj)
-                                //{
+                            {   
                                 try
                                 {
                                     Crawling(host + nextUrl, host);
                                     m_CompletedCount++;
                                 }
                                 catch { }
-                                // }));
                             }
                         }
                     }
@@ -163,8 +166,14 @@ namespace Spider
                     host = GetHost(url);
                 }
             }
-
-            string pageHtml = VisitedHelper.HttpRequestUtil.GetPageHtml(url);
+            string pageHtml = "";
+            var iTimeStart = Environment.TickCount;
+            Task.Factory.StartNew(() => { pageHtml = VisitedHelper.HttpRequestUtil.GetPageHtml(url); }).Wait(10 * 1000);
+            if (Environment.TickCount - iTimeStart > 10000)
+            {
+                throw new Exception($"访问{url}超时!");//访问首页超时直接停止程序
+            }
+            
             Regex regA = new Regex(@"<a[\s]+[^<>]*href=(?:""|')([^<>""']+)(?:""|')[^<>]*>[^<>]+</a>", RegexOptions.IgnoreCase);
             MatchCollection mcA = regA.Matches(pageHtml);
             foreach (Match mA in mcA)

@@ -5,7 +5,7 @@ using System.Text;
 using System.Net;
 using System.Text.RegularExpressions;
 using static Spider.Config;
-
+using System.Threading.Tasks;
 namespace Spider
 {
     public class ImageSpider
@@ -16,7 +16,9 @@ namespace Spider
         {
             urlOver += new UrlOverEventHandler(ShowMessage);
             urlError += new UrlErrorEventHandler(ShowMessage);
+            
         }
+       
         public struct ImageInfo
         {
             public string Path { get; set; }
@@ -127,43 +129,6 @@ namespace Spider
             return ImageAndTitle;
         }
 
-        string SaveImg(List<string> list, string savepath)
-        {
-            if (list?.Count <= 0)
-            {
-                return "未解析到图片地址";
-            }
-            string dic = path + "\\" + savepath;
-            if (!Directory.Exists(dic))
-                Directory.CreateDirectory(dic);
-            int s = 0, f = 0;
-            foreach (string url in list)
-            {
-                string name = "图片名获取失败";
-                //取文件名
-                try
-                {
-                    name = url.Substring(url.LastIndexOf('/') + 1, url.Length - url.LastIndexOf('/') - 5);
-                }
-                catch
-                { continue; }
-                WebClient wc = new WebClient();
-                try
-                {
-                    wc.DownloadFile(url, dic + "\\" + name + ".jpg");
-                    s++;
-                    urlOver?.Invoke($"从{url}抓取图片{ name + ".jpg"}成功！");
-                }
-                catch (Exception ex)
-                {
-                    f++; urlOver?.Invoke($"从{url}抓取图片{name + ".jpg"}失败！" /*+ ex.ToString()*/);
-                }
-                finally { wc.Dispose(); }
-            }
-            string msg = $"一共抓到{list.Count}个图片地址,成功下载{s}张图片,下载失败{f}张,图片保存路径{dic}";
-            return msg;
-        }
-
         string SaveImg(Dictionary<string,string> dict, string savepath)
         {
             if (dict.Keys?.Count <= 0)
@@ -187,18 +152,30 @@ namespace Spider
                 WebClient wc = new WebClient();
                 try
                 {
-                    wc.DownloadFile("https:" + url, dic + "\\" + name + ".jpg");
-                    s++;
-                    urlOver?.Invoke($"从{url}抓取图片{ name + ".jpg"}成功！");
+                    var iTimeStart = Environment.TickCount;
+                    Task.Factory.StartNew(() => { wc.DownloadFile("https:" + url, dic + "\\" + name + ".jpg");}).Wait(2 * 1000);
+                    if (Environment.TickCount - iTimeStart <= 2000)
+                    {
+                        s++;
+                        urlOver?.Invoke($"从{url}抓取图片{ name + ".jpg"}成功！");
+                    }
+                    else
+                    {
+                        f++;
+                        urlOver?.Invoke($"从{url}抓取图片{name + ".jpg"}超时!");
+                    }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    f++; urlOver?.Invoke($"从{url}抓取图片{name + ".jpg"}失败！" /*+ ex.ToString()*/);
+                    f++;
+                    urlOver?.Invoke($"从{url}抓取图片{name + ".jpg"}失败！" /*+ ex.ToString()*/);
                 }
                 finally { wc.Dispose(); }
             }
             string msg = $"一共抓到{dict.Keys.Count}个图片地址,成功下载{s}张图片,下载失败{f}张,图片保存路径{dic}";
             return msg;
         }
+
+        
     }
 }
